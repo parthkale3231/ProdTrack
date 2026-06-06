@@ -1,28 +1,39 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
-import { ThemeToggle } from "../components/theme-toggle";
+import { Input } from "@workspace/ui/components/input";
+import { Label } from "@workspace/ui/components/label";
+import { ThemeToggle } from "../../components/theme-toggle";
 
-export default function LandingPage() {
+export default function LoginPage() {
+  const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
- 
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    router.push("/home-panel");
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
- 
+
     let animId: number;
     let time = 0;
- 
+
     const resize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resize();
     window.addEventListener("resize", resize);
- 
+
     // ── geometric shapes flying through the grid ──
     type Shape = {
       x: number; y: number;
@@ -33,7 +44,7 @@ export default function LandingPage() {
       rotation: number;
       rotSpeed: number;
     };
- 
+
     const shapes: Shape[] = Array.from({ length: 18 }, () => {
       const type = (["triangle", "circle", "diamond", "cross"] as const)[
         Math.floor(Math.random() * 4)
@@ -50,7 +61,7 @@ export default function LandingPage() {
         rotSpeed: (Math.random() - 0.5) * 0.08, // Spin fast!
       };
     });
- 
+
     // ── flowing connecting lines between nearest shapes ──
     const draw = () => {
       const W = canvas.width;
@@ -59,12 +70,12 @@ export default function LandingPage() {
       time += 0.03; // Move fast!
 
       const isDark = document.documentElement.classList.contains("dark");
- 
+
       // ── scrolling grid ──
       const gridSize = 60;
       const offsetX = (time * 30) % gridSize;
       const offsetY = (time * 18) % gridSize;
- 
+
       ctx.strokeStyle = isDark ? "rgba(59,130,246,0.15)" : "rgba(0,0,0,0.12)"; // Bolder grid lines
       ctx.lineWidth = 1.0;
       ctx.beginPath();
@@ -77,7 +88,7 @@ export default function LandingPage() {
         ctx.lineTo(W, y);
       }
       ctx.stroke();
- 
+
       // ── subtle diagonal accent lines ──
       ctx.strokeStyle = isDark ? "rgba(59,130,246,0.08)" : "rgba(0,0,0,0.06)";
       ctx.lineWidth = 1.0;
@@ -88,7 +99,7 @@ export default function LandingPage() {
         ctx.lineTo(d + H, H);
       }
       ctx.stroke();
- 
+
       // ── update + draw shapes ──
       for (const s of shapes) {
         s.x += s.vx;
@@ -98,7 +109,7 @@ export default function LandingPage() {
         if (s.x > W + 60) s.x = -60;
         if (s.y < -60) s.y = H + 60;
         if (s.y > H + 60) s.y = -60;
- 
+
         ctx.save();
         ctx.translate(s.x, s.y);
         ctx.rotate(s.rotation);
@@ -106,7 +117,7 @@ export default function LandingPage() {
         ctx.strokeStyle = isDark ? `rgba(59,130,246,${s.opacity * 0.95})` : `rgba(0,0,0,${s.opacity * 0.95})`;
         ctx.lineWidth = 2.5; // Bold shape borders
         ctx.fillStyle = isDark ? `rgba(59,130,246,0.18)` : `rgba(0,0,0,0.12)`;
- 
+
         ctx.beginPath();
         switch (s.type) {
           case "triangle":
@@ -134,7 +145,7 @@ export default function LandingPage() {
         ctx.stroke();
         ctx.restore();
       }
- 
+
       // ── connecting lines between close shapes ──
       for (let i = 0; i < shapes.length; i++) {
         const s1 = shapes[i];
@@ -156,20 +167,20 @@ export default function LandingPage() {
           }
         }
       }
- 
+
       animId = requestAnimationFrame(draw);
     };
- 
+
     draw();
- 
+
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener("resize", resize);
     };
   }, []);
- 
+
   return (
-    <div className="relative min-h-screen w-full bg-neutral-50 dark:bg-black text-neutral-900 dark:text-white transition-colors duration-500 overflow-hidden flex items-center justify-center px-6 py-20 md:py-32">
+    <div className="relative min-h-screen w-full bg-neutral-50 dark:bg-black text-neutral-900 dark:text-white transition-colors duration-500 overflow-hidden flex items-center justify-center px-4 py-16">
       {/* Animated canvas background */}
       <canvas
         ref={canvasRef}
@@ -177,54 +188,108 @@ export default function LandingPage() {
         aria-hidden="true"
       />
 
-      {/* Theme Switcher Header */}
+      {/* Theme Toggle Button */}
       <div className="absolute top-6 right-6 z-20">
         <ThemeToggle />
       </div>
- 
-      {/* Subtle radial spotlight behind content */}
+
+      {/* Subtle radial spotlight behind the card */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.035) 0%, transparent 60%)",
+            "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(255,255,255,0.04) 0%, transparent 70%)",
         }}
         aria-hidden="true"
       />
- 
-      {/* Main Content Layout (Horizontal Split Grid) */}
-      <main className="relative z-10 w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-center">
-        {/* Left Column: Branding and Call-to-Action */}
-        <div className="lg:col-span-5 flex flex-col items-start gap-8">
-          <div className="flex flex-col gap-3">
-            <h1
-              className="text-6xl md:text-7xl font-extrabold tracking-tight bg-gradient-to-br from-blue-600 via-blue-800 to-indigo-500 dark:from-blue-400 dark:via-blue-350 dark:to-indigo-300 bg-clip-text text-transparent leading-none"
-              style={{ letterSpacing: "-0.03em" }}
-            >
-              ProdTrack
-            </h1>
-            <p className="text-lg font-medium text-neutral-600 dark:text-neutral-400 max-w-md">
-              Streamline your product lifecycle. Track metrics, manage sprints, and optimize workflows in one unified platform.
-            </p>
-          </div>
- 
-          <div className="flex gap-5 items-center">
-            <Button
-              asChild
-              size="lg"
-              className="font-semibold rounded-lg px-8 py-3.5 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg bg-neutral-900 text-white hover:bg-neutral-850 dark:bg-white dark:text-black dark:hover:bg-white/90 border-none cursor-pointer"
-            >
-              <Link href="/Login">Sign In</Link>
-            </Button>
-            <a href="#features" className="text-sm font-semibold text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors duration-200">
-              Explore Features &rarr;
-            </a>
-          </div>
+
+      {/* Glassmorphic Login Card */}
+      <main
+        className="relative z-10 w-full max-w-md flex flex-col gap-8 px-8 py-10 rounded-[20px] backdrop-blur-xl bg-white/70 border border-neutral-200/50 dark:bg-neutral-950/40 dark:border-neutral-900/60 shadow-xl dark:shadow-neutral-950/80 transition-colors duration-500"
+      >
+        {/* Header */}
+        <div className="flex flex-col gap-2 items-center text-center">
+          <h1
+            className="text-4xl font-extrabold tracking-tight bg-gradient-to-br from-blue-600 via-blue-800 to-indigo-500 dark:from-blue-400 dark:via-blue-350 dark:to-indigo-300 bg-clip-text text-transparent leading-none"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            ProdTrack
+          </h1>
+          <p className="text-sm text-neutral-600 dark:text-neutral-450 mt-1">
+            Sign in to access your dashboard
+          </p>
         </div>
- 
+
+        {/* Login Form */}
+        <form onSubmit={handleLoginSubmit} className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="username" className="text-neutral-800 dark:text-neutral-250">Username</Label>
+            <Input
+              id="username"
+              type="text"
+              placeholder="name@example.com"
+              required
+              autoComplete="username"
+              className="bg-white/50 dark:bg-neutral-950/20 border-neutral-200 dark:border-neutral-850"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="password" className="text-neutral-800 dark:text-neutral-250">Password</Label>
+              <Link
+                href="/Forgot-Password"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline transition-all duration-200"
+              >
+                Forgot password?
+              </Link>
+            </div>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                required
+                className="pr-10 bg-white/50 dark:bg-neutral-950/20 border-neutral-200 dark:border-neutral-850"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-350 focus:outline-none transition-colors duration-200 cursor-pointer"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full font-semibold rounded-lg py-2.5 transition-all duration-200 bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-white/90 border-none cursor-pointer"
+          >
+            Log In
+          </Button>
+        </form>
+
+        {/* Footer / Alt Actions */}
+        <div className="flex flex-col gap-4 text-center">
+          <div className="h-[0.5px] bg-neutral-200 dark:bg-neutral-850" />
+          <Link
+            href="/"
+            className="text-xs text-neutral-500 hover:text-neutral-900 dark:text-neutral-450 dark:hover:text-white transition-colors duration-200"
+          >
+            &larr; Back to Landing Page
+          </Link>
+        </div>
       </main>
- 
-      {/* Absolute positioned Footer */}
+
+      {/* Footer */}
       <footer
         className="absolute bottom-6 left-0 right-0 text-center text-xs tracking-wider uppercase text-neutral-400 dark:text-neutral-600"
       >
