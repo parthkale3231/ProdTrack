@@ -1,7 +1,10 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  "globalEnv": ["NODE_ENV"],
+  "globalEnv": [
+    "NODE_ENV",
+    "MONGODB_URI"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

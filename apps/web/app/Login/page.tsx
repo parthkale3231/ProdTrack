@@ -13,9 +13,37 @@ export default function LoginPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push("/home-panel");
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Login failed");
+        setLoading(false);
+        return;
+      }
+
+      // Automatically redirect to the secure dashboard on success
+      router.push("/home-panel");
+    } catch (err: any) {
+      setError("An unexpected error occurred. Please try again.");
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -222,14 +250,22 @@ export default function LoginPage() {
 
         {/* Login Form */}
         <form onSubmit={handleLoginSubmit} className="flex flex-col gap-6">
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 p-3 rounded-md text-sm text-center font-medium">
+              {error}
+            </div>
+          )}
+
           <div className="flex flex-col gap-2">
-            <Label htmlFor="username" className="text-neutral-800 dark:text-neutral-250">Username</Label>
+            <Label htmlFor="email" className="text-neutral-800 dark:text-neutral-250">Email</Label>
             <Input
-              id="username"
-              type="text"
+              id="email"
+              type="email"
               placeholder="name@example.com"
               required
-              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               className="bg-white/50 dark:bg-neutral-950/20 border-neutral-200 dark:border-neutral-850"
             />
           </div>
@@ -250,6 +286,8 @@ export default function LoginPage() {
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="pr-10 bg-white/50 dark:bg-neutral-950/20 border-neutral-200 dark:border-neutral-850"
                 autoComplete="current-password"
               />
