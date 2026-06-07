@@ -32,7 +32,12 @@ build_app:
   stage: build
   script:
     # Use turborepo to build the web app
-    - bunx turbo build --filter=web
+    - |
+      if [ -z "$MONGODB_URI" ]; then
+        echo "ERROR: MONGODB_URI is not set. Define it in CI/CD variables or set it here." && exit 1
+      fi
+      echo "MONGODB_URI=$MONGODB_URI" > apps/web/.env.local
+      bunx turbo build --filter=web
   artifacts:
     paths:
       - apps/web/.next/
