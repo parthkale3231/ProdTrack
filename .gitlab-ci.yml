@@ -31,18 +31,26 @@ lint_and_format:
 build_app:
   stage: build
   script:
-    # Use turborepo to build the web app
-    - |
-      if [ -z "$MONGODB_URI" ]; then
-        echo "ERROR: MONGODB_URI is not set. Define it in CI/CD variables or set it here." && exit 1
-      fi
-      echo "MONGODB_URI=$MONGODB_URI" > apps/web/.env.local
-      bunx turbo build --filter=web
+    - echo "Checking MongoDB URI..."
+    - if [ -z "$MONGODB_URI" ]; then echo "NOT SET"; exit 1; fi
+
+    - echo "MONGODB_URI=$MONGODB_URI" > apps/web/.env.local
+
+    - echo "===== .env.local ====="
+    - cat apps/web/.env.local
+
+    - echo "===== Current Directory ====="
+    - pwd
+
+    - echo "===== apps/web ====="
+    - ls -la apps/web
+
+    - bunx turbo build --filter=web
   artifacts:
     paths:
       - apps/web/.next/
     expire_in: 1 week
-  needs:
+  needs:-
     - install_dependencies
 
 # Optional: Build a Docker image if you plan to deploy using Docker
