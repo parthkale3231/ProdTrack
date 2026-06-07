@@ -1,4 +1,4 @@
-image: oven/bun:latest # Use the official Bun image
+image: oven/bun:latest
 
 stages:
   - setup
@@ -6,15 +6,15 @@ stages:
   - build
   - docker
 
-# Cache node_modules to speed up subsequent jobs
 cache:
   key:
     files:
-      - bun.lock
+      - bun.lockb
   paths:
     - node_modules/
     - apps/*/node_modules/
     - packages/*/node_modules/
+  policy: pull-push
 
 install_dependencies:
   stage: setup
@@ -23,16 +23,23 @@ install_dependencies:
 
 lint_and_format:
   stage: check
-  script:
-    - bun run lint
   needs:
     - install_dependencies
+  script:
+    - bun run lint
 
 build_app:
   stage: build
+  needs:
+    - install_dependencies
   script:
     - echo "Checking MongoDB URI..."
-    - if [ -z "$MONGODB_URI" ]; then echo "NOT SET"; exit 1; fi
+
+    - |
+      if [ -z "$MONGODB_URI" ]; then
+        echo "MONGODB_URI is NOT SET"
+        exit 1
+      fi
 
     - echo "MONGODB_URI=$MONGODB_URI" > apps/web/.env.local
 
@@ -46,29 +53,35 @@ build_app:
     - ls -la apps/web
 
     - bunx turbo build --filter=web
+
   artifacts:
     paths:
       - apps/web/.next/
     expire_in: 1 week
-  needs:-
-    - install_dependencies
 
-# Optional: Build a Docker image if you plan to deploy using Docker
 build_docker_image:
   stage: docker
   image: docker:latest
+
   services:
     - docker:dind
+
   variables:
     DOCKER_DRIVER: overlay2
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-  script:
-    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
-    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
-    - docker push $CI_REGISTRY_IMAGE:latest
-  only:
-    - main # Only run this step when pushing to the main branch
+    DOCKER_TLS_CERTDIR: ""
+
   needs:
     - build_app
+
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+
+  script:
+    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA" .
+    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+
+    - docker tag "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA" "$CI_REGISTRY_IMAGE:latest"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+
+  only:
+    - main
