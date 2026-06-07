@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Clock, User } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
@@ -66,64 +66,15 @@ export default function ProductsPage() {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
-  const handleItemNoKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      fetchProductDetails(itemNo);
-    }
-  };
+  // Compute read-only fields dynamically on every render
+  const loadedProduct = itemNo.trim() ? getProduct(itemNo) : undefined;
 
-  const fetchProductDetails = (searchItemNo: string) => {
-    if (!searchItemNo.trim()) {
-      setNotification({ message: "Please enter an Item number to search.", type: "error" });
-      return;
-    }
-
-    const prod = getProduct(searchItemNo);
-    if (prod) {
-      // Product exists - populate details
-      setDescription(prod.desc);
-      setPoNo(prod.poNo);
-      setLineNo(String(prod.lineNo));
-      setPoDate(formatToInputDate(prod.poDate));
-      setPoConfirmDelyDate(formatToInputDate(prod.poConfirmDelDate));
-      setWoNo(prod.woNo);
-      setStdLeadTime(String(prod.stdLeadTime));
-      setRemark(prod.remark);
-
-      // Enforce stage logic
-      const nextStage = getNextRequiredStage(prod);
-      setIsCompletedProduct(nextStage === null);
-
-      if (nextStage) {
-        setOperation(nextStage.id);
-        
-        const opData = prod.operations[nextStage.id as keyof typeof prod.operations];
-        
-        // Lockout and pre-population rules
-        if (opData.inTime) {
-          setInDateStatus(formatToInputDatetime(opData.inTime));
-          setOutDateStatus(getCurrentDatetimeLocalString());
-        } else {
-          setInDateStatus(getCurrentDatetimeLocalString());
-          setOutDateStatus("");
-        }
-
-        setNotification({
-          message: `Product details loaded. Next operation in queue: "${nextStage.label}".`,
-          type: "info",
-        });
-      } else {
-        setOperation("");
-        setInDateStatus("");
-        setOutDateStatus("");
-        setNotification({
-          message: `Product loaded. All operations (including Dispatch) are completed.`,
-          type: "success",
-        });
-      }
+  // Auto-sync the form fields whenever a matching product is found
+  useEffect(() => {
+    if (loadedProduct) {
+      populateFormFromProduct(loadedProduct);
     } else {
-      // Product does not exist - reset other fields for new entry
+      // Clear or set defaults for new product
       setIsCompletedProduct(false);
       setDescription("");
       setPoNo("");
@@ -137,15 +88,53 @@ export default function ProductsPage() {
       setInDateStatus(getCurrentDatetimeLocalString()); // Auto start listProvided
       setOutDateStatus("");
       setRemark("");
+    }
+  }, [loadedProduct]);
+
+  const populateFormFromProduct = (prod: any) => {
+    setDescription(prod.desc);
+    setPoNo(prod.poNo);
+    setLineNo(String(prod.lineNo));
+    setPoDate(formatToInputDate(prod.poDate));
+    setPoConfirmDelyDate(formatToInputDate(prod.poConfirmDelDate));
+    setWoNo(prod.woNo);
+    setStdLeadTime(String(prod.stdLeadTime));
+    setRemark(prod.remark);
+
+    const nextStage = getNextRequiredStage(prod);
+    setIsCompletedProduct(nextStage === null);
+
+    if (nextStage) {
+      setOperation(nextStage.id);
+      
+      const opData = prod.operations[nextStage.id as keyof typeof prod.operations];
+      
+      if (opData.inTime) {
+        setInDateStatus(formatToInputDatetime(opData.inTime));
+        setOutDateStatus(getCurrentDatetimeLocalString());
+      } else {
+        setInDateStatus(getCurrentDatetimeLocalString());
+        setOutDateStatus("");
+      }
 
       setNotification({
-        message: "Product not found. Fill in the fields below to register as a new product starting at 'List provided'.",
+        message: `Product details loaded. Next operation in queue: "${nextStage.label}".`,
         type: "info",
+      });
+    } else {
+      setOperation("");
+      setInDateStatus("");
+      setOutDateStatus("");
+      setNotification({
+        message: `Product loaded. All operations (including Dispatch) are completed.`,
+        type: "success",
       });
     }
   };
 
-  const handleProdIn = (e: React.FormEvent) => {
+  // fetchProductDetails is removed; auto-sync effect handles it now
+
+  const handleProdIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!itemNo.trim()) {
       setNotification({ message: "Item number is required.", type: "error" });
@@ -153,7 +142,7 @@ export default function ProductsPage() {
     }
 
     // Call shared database state updater
-    const result = registerOrUpdateProduct(
+    const result = await registerOrUpdateProduct(
       {
         itemNo,
         desc: description,
@@ -178,8 +167,10 @@ export default function ProductsPage() {
       return;
     }
 
-    // Success! Re-load product details to show computed statuses
-    fetchProductDetails(itemNo);
+    // Success! Re-load product details to show computed statuses using the explicitly returned updated product
+    if (result.product) {
+      populateFormFromProduct(result.product);
+    }
 
     setNotification({
       message: `Stage successfully updated for product ${itemNo}!`,
@@ -187,7 +178,7 @@ export default function ProductsPage() {
     });
   };
 
-  const handleProdOut = (e: React.MouseEvent) => {
+  const handleProdOut = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!itemNo.trim()) {
       setNotification({ message: "Item number is required to perform Prod Out.", type: "error" });
@@ -205,7 +196,7 @@ export default function ProductsPage() {
     }
 
     // Remove from central database
-    deleteProduct(itemNo);
+    await deleteProduct(itemNo);
 
     // Reset Form
     setItemNo("");
@@ -228,8 +219,7 @@ export default function ProductsPage() {
     });
   };
 
-  // Compute read-only fields dynamically on every render
-  const loadedProduct = itemNo.trim() ? getProduct(itemNo) : undefined;
+  // The variables below compute stats based on loadedProduct
   
   const totalLeadTimeDisplay = loadedProduct?.totalLeadTime !== undefined 
     ? `${loadedProduct.totalLeadTime} Days` 
@@ -303,13 +293,11 @@ export default function ProductsPage() {
               <div className="flex flex-col gap-2">
                 <div className="flex justify-between items-center">
                   <Label htmlFor="itemNo" className="text-neutral-850 dark:text-neutral-200">Item no</Label>
-                  <span className="text-[10px] text-neutral-500 font-mono">Press Enter</span>
                 </div>
                 <Input
                   id="itemNo"
                   value={itemNo}
                   onChange={(e) => setItemNo(e.target.value)}
-                  onKeyDown={handleItemNoKeyDown}
                   placeholder="e.g. IT-889"
                   className="bg-white/50 dark:bg-neutral-950/20 border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-300"
                   required
@@ -421,7 +409,8 @@ export default function ProductsPage() {
                 <Button
                   type="submit"
                   size="lg"
-                  className="font-bold rounded-lg px-10 py-3 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-md bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-white/90 border-none cursor-pointer"
+                  disabled={!operation} // Prevent submission if operation is unselected
+                  className="font-bold rounded-lg px-10 py-3 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-md bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-white/90 border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isStageStarted ? "Complete Stage" : "Start Stage"}
                 </Button>

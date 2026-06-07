@@ -1,0 +1,61 @@
+image: oven/bun:latest # Use the official Bun image
+
+stages:
+  - setup
+  - check
+  - build
+  - docker
+
+# Cache node_modules to speed up subsequent jobs
+cache:
+  key:
+    files:
+      - bun.lock
+  paths:
+    - node_modules/
+    - apps/*/node_modules/
+    - packages/*/node_modules/
+
+install_dependencies:
+  stage: setup
+  script:
+    - bun install --frozen-lockfile
+
+lint_and_format:
+  stage: check
+  script:
+    - bun run lint
+  needs:
+    - install_dependencies
+
+build_app:
+  stage: build
+  script:
+    # Use turborepo to build the web app
+    - bunx turbo build --filter=web
+  artifacts:
+    paths:
+      - apps/web/.next/
+    expire_in: 1 week
+  needs:
+    - install_dependencies
+
+# Optional: Build a Docker image if you plan to deploy using Docker
+build_docker_image:
+  stage: docker
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:latest
+  only:
+    - main # Only run this step when pushing to the main branch
+  needs:
+    - build_app

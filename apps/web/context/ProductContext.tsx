@@ -43,6 +43,7 @@ export type ProductTrack = {
     dispatch: OperationStatus;
   };
   remark: string;
+  isArchived?: boolean;
 };
 
 export const STAGE_ORDER = [
@@ -67,100 +68,13 @@ type ProductContextType = {
     selectedOpId?: string,
     inDateStatus?: string,
     outDateStatus?: string
-  ) => { success: boolean; error?: string };
+  ) => Promise<{ success: boolean; error?: string; product?: ProductTrack }>;
   getNextRequiredStage: (product: ProductTrack) => typeof STAGE_ORDER[number] | null;
   getCurrentStage: (product: ProductTrack) => typeof STAGE_ORDER[number] | null;
-  deleteProduct: (itemNo: string) => void;
+  deleteProduct: (itemNo: string) => Promise<void>;
 };
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
-
-const INITIAL_PRODUCTS: ProductTrack[] = [
-  {
-    lastExec: "02-02-2026",
-    itemNo: "0278479 S",
-    desc: "G-220.69-0080-18-XAN",
-    poNo: "6665869",
-    lineNo: 70,
-    poDate: "20-02-2026",
-    poConfirmDelDate: "02-04-2026",
-    remainingDays: "Dispatched on 10-06-2026",
-    remainingStyle: "success",
-    stdLeadTime: 30,
-    woNo: "A-1",
-    startDate: "26-05-2026",
-    endDate: "10-06-2026",
-    totalLeadTime: 25,
-    currentLeadTime: 25,
-    operations: {
-      listProvided: { stdTime: 1, inTime: "26-05-2026", outTime: "27-05-2026", leadTime: 1 },
-      cuttingCompleted: { stdTime: 1, inTime: "27-05-2026", outTime: "27-05-2026", leadTime: 1 },
-      roughTurning1: { stdTime: 3, inTime: "28-05-2026", outTime: "30-05-2026", leadTime: 3 },
-      roughTurning2: { stdTime: 3, inTime: "30-05-2026", outTime: "02-06-2026", leadTime: 3 },
-      heatTreatment: { stdTime: 7, inTime: "02-06-2026", outTime: "04-06-2026", leadTime: 2 },
-      finish1st: { stdTime: 3, inTime: "04-06-26, 8:20", outTime: "05-06-26, 15:30", leadTime: 2 },
-      finish2nd: { stdTime: 2, inTime: "05-06-26, 16:15", outTime: "05-06-26, 09:30", leadTime: 1 },
-      slotting: { stdTime: 2, inTime: "06-06-26, 09:00", outTime: "09-06-26, 10:00", leadTime: 4 },
-      inspection: { stdTime: 1, inTime: "09-06-26, 10:20", outTime: "12-06-26, 15:30", leadTime: 4 },
-      rfd: { stdTime: 1, inTime: "07-06-2026", outTime: "10-06-2026", leadTime: 3 },
-      dispatch: { stdTime: 1, inTime: "10-06-2026", outTime: "10-06-2026", leadTime: 1 },
-    },
-    remark: "Dispatched"
-  },
-  {
-    lastExec: "05-01-2026",
-    itemNo: "10108673",
-    itemNoStyle: "critical",
-    desc: "G-220.69-02.00-16",
-    poNo: "6666444",
-    lineNo: 60,
-    poDate: "05-03-2026",
-    poConfirmDelDate: "28-05-2026",
-    remainingDays: 7,
-    remainingStyle: "warning",
-    stdLeadTime: 30,
-    woNo: "A-2",
-    startDate: "10-05-2026",
-    currentLeadTime: 14,
-    operations: {
-      listProvided: { stdTime: 1, inTime: "10-05-2026", outTime: "11-05-2026", leadTime: 1 },
-      cuttingCompleted: { stdTime: 1, inTime: "11-05-2026", outTime: "12-05-2026", leadTime: 1 },
-      roughTurning1: { stdTime: 3, inTime: "12-05-2026", outTime: "15-05-2026", leadTime: 3 },
-      roughTurning2: { stdTime: 3, inTime: "15-05-2026", outTime: "19-05-2026", leadTime: 4 },
-      heatTreatment: { stdTime: 7, inTime: "19-05-2026", outTime: "24-05-2026", leadTime: 5 },
-      finish1st: { stdTime: 3 },
-      finish2nd: { stdTime: 2 },
-      slotting: { stdTime: 2 },
-      inspection: { stdTime: 1 },
-      rfd: { stdTime: 1 },
-      dispatch: { stdTime: 1 },
-    },
-    remark: "Finish 1st set up"
-  },
-  {
-    lastExec: "05-01-2026",
-    itemNo: "10208226",
-    desc: "G-220.43-0063-05-XX",
-    poNo: "6666445",
-    lineNo: 20,
-    poDate: "05-03-2026",
-    woNo: "A-3",
-    operations: {
-      listProvided: { stdTime: 1 },
-      cuttingCompleted: { stdTime: 1 },
-      roughTurning1: { stdTime: 3 },
-      roughTurning2: { stdTime: 3 },
-      heatTreatment: { stdTime: 7 },
-      finish1st: { stdTime: 3 },
-      finish2nd: { stdTime: 2 },
-      slotting: { stdTime: 2 },
-      inspection: { stdTime: 1 },
-      rfd: { stdTime: 1 },
-      dispatch: { stdTime: 1 },
-    },
-    remark: ""
-  }
-];
 
 export const parseDateString = (dateStr: string): Date | null => {
   if (!dateStr) return null;
@@ -179,13 +93,11 @@ export const parseDateString = (dateStr: string): Date | null => {
     if (p0 === undefined || p1 === undefined || p2 === undefined) return null;
 
     if (p0.length === 4) {
-      // Format is YYYY-MM-DD
       const year = parseInt(p0, 10);
       const month = parseInt(p1, 10) - 1;
       const day = parseInt(p2, 10);
       return new Date(year, month, day);
     } else {
-      // Format is DD-MM-YYYY
       const day = parseInt(p0, 10);
       const month = parseInt(p1, 10) - 1;
       let year = parseInt(p2, 10);
@@ -290,51 +202,22 @@ export function populateProductFields(prod: ProductTrack): ProductTrack {
 }
 
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [products, setProducts] = useState<ProductTrack[]>(() => {
-    return INITIAL_PRODUCTS.map(populateProductFields);
-  });
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [products, setProducts] = useState<ProductTrack[]>([]);
 
-  // Load from localStorage on mount to prevent SSR hydration mismatches
+  // Load from MongoDB on mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("prodtrack_products");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as ProductTrack[];
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setProducts(parsed.map(populateProductFields));
-        } catch (e) {
-          console.error("Failed to parse saved products", e);
+    const fetchProducts = async () => {
+      try {
+        const res = await fetch('/api/products');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setProducts(data.map(populateProductFields));
         }
-      }
-      setIsInitialized(true);
-    }
-  }, []);
-
-  // Save to localStorage on change only after initialization is complete
-  useEffect(() => {
-    if (isInitialized && typeof window !== "undefined") {
-      localStorage.setItem("prodtrack_products", JSON.stringify(products));
-    }
-  }, [products, isInitialized]);
-
-  // Sync across tabs
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "prodtrack_products" && e.newValue) {
-        try {
-          setProducts(JSON.parse(e.newValue).map(populateProductFields));
-        } catch (err) {
-          console.error("Failed to parse storage update", err);
-        }
+      } catch (err) {
+        console.error("Failed to fetch products", err);
       }
     };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    fetchProducts();
   }, []);
 
   const dynamicProducts = products.map((p) => {
@@ -392,8 +275,19 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return dynamicProducts.find((p) => p.itemNo.toLowerCase() === itemNo.trim().toLowerCase());
   };
 
-  const deleteProduct = (itemNo: string) => {
-    setProducts((prev) => prev.filter((p) => p.itemNo.toLowerCase() !== itemNo.trim().toLowerCase()));
+  const deleteProduct = async (itemNo: string) => {
+    try {
+      await fetch(`/api/products/${itemNo}`, { method: 'DELETE' });
+      setProducts((prev) => 
+        prev.map((p) => 
+          p.itemNo.toLowerCase() === itemNo.trim().toLowerCase() 
+            ? { ...p, isArchived: true } 
+            : p
+        )
+      );
+    } catch (error) {
+      console.error("Failed to delete product", error);
+    }
   };
 
   const getNextRequiredStage = (product: ProductTrack) => {
@@ -424,12 +318,12 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return activeStage || lastCompleted || STAGE_ORDER[0];
   };
 
-  const registerOrUpdateProduct = (
+  const registerOrUpdateProduct = async (
     productData: Partial<ProductTrack> & { itemNo: string },
     selectedOpId?: string,
     inDateStatus?: string,
     outDateStatus?: string
-  ): { success: boolean; error?: string } => {
+  ): Promise<{ success: boolean; error?: string; product?: ProductTrack }> => {
     const existingIndex = products.findIndex(
       (p) => p.itemNo.toLowerCase() === productData.itemNo.trim().toLowerCase()
     );
@@ -621,18 +515,36 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     product.lastExec = formatDateString(new Date());
 
-    setProducts((prevProducts) => {
-      const next = [...prevProducts];
-      const updatedProduct = populateProductFields(product);
-      if (!isNewProduct) {
-        next[existingIndex] = updatedProduct;
-      } else {
-        next.push(updatedProduct);
+    try {
+      const method = isNewProduct ? 'POST' : 'PUT';
+      const url = isNewProduct ? '/api/products' : `/api/products/${product.itemNo}`;
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product)
+      });
+      const data = await res.json();
+      
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || "API Error" };
       }
-      return next;
-    });
 
-    return { success: true };
+      setProducts((prevProducts) => {
+        const next = [...prevProducts];
+        const updatedProduct = populateProductFields(product);
+        if (!isNewProduct) {
+          next[existingIndex] = updatedProduct;
+        } else {
+          next.push(updatedProduct);
+        }
+        return next;
+      });
+
+      return { success: true, product: populateProductFields(product) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
   };
 
   return (
